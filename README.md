@@ -4,7 +4,7 @@
 
 # RuView
 
-**WiFi sensing with a local web dashboard.**
+**WiFi sensing, a local web dashboard and sensor tools.**
 
 [![ruview](https://snapcraft.io/ruview/badge.svg)](https://snapcraft.io/ruview)
 [![Base: core26](https://img.shields.io/badge/Base-core26-2C8C3C?logo=canonical&logoColor=white)](https://snapcraft.io/core26)
@@ -14,7 +14,7 @@
 
 [Getting Started](#getting-started) · [Configure](#configure) · [Limitations](#limitations) · [Build](#build) · [Support](#support) · [License](#license)
 
-Unofficial snap packaging for [RuView](https://github.com/ruvnet/RuView), a WiFi sensing server with a browser dashboard.
+Unofficial snap packaging for [RuView](https://github.com/ruvnet/RuView), including the sensing server, browser dashboard and operator toolkit.
 
 </div>
 
@@ -36,7 +36,7 @@ Real sensing requires compatible ESP32 hardware running the [upstream CSI firmwa
 sudo snap set ruview udp-address=0.0.0.0 udp-allow=192.168.1.50
 ```
 
-Replace `192.168.1.50` with your sensor's IP address. Hardware setup and firmware flashing are performed separately from the snap.
+Replace `192.168.1.50` with your sensor's IP address. The toolkit can flash a downloaded firmware bundle, and `ruview.provision` configures the node's WiFi and server address.
 
 To explore the dashboard with synthetic data:
 
@@ -45,6 +45,29 @@ sudo snap set ruview source=simulated
 ```
 
 Simulated output is a demonstration, not a measurement of people or a room. Restore sensor input with `sudo snap set ruview source=esp32`.
+
+| Command | Purpose |
+| --- | --- |
+| `ruview` | Run the sensing server in the foreground |
+| `ruview.toolkit` | Diagnostics, device tools, firmware flashing and MCP |
+| `ruview.cli` | `wifi-densepose` calibration, enrollment and room commands |
+| `ruview.provision` | Configure ESP32 WiFi and sensor settings |
+
+```bash
+ruview.toolkit --help
+ruview.toolkit doctor --url http://127.0.0.1:8080
+ruview.toolkit mcp start
+```
+
+Node, Python, esptool, pyserial, the NVS generator and the WASM sensing kernel are included. For USB sensors:
+
+```bash
+sudo snap connect ruview:raw-usb
+```
+
+For other UART devices, use `snap interface serial-port` to find the device slot, then `sudo snap connect ruview:serial-port PROVIDER:SLOT`.
+
+For remote tools, connect `sudo snap connect ruview:ssh-keys` and establish host trust with SSH first. Remote hosts need Node/npm because the toolkit runs through `npx` there. Upstream supports file-based keys here, not SSH-agent authentication.
 
 ## Configure
 
@@ -77,12 +100,15 @@ ruview --source simulated
 
 Use `ruview --source esp32` for foreground sensor input. Foreground data is stored separately in `~/snap/ruview/common/data`. Stop the foreground process before restarting the service with `sudo snap start ruview.daemon`.
 
+Toolkit capture and CLI calibration also listen on UDP `5005`. Stop the service before using them on that port, then restart it afterwards. Toolkit settings and credentials are stored under the snap's user home, `~/snap/ruview/current`.
+
 ## Limitations
 
 - ESP32 hardware and firmware are not included. The snap receives packets from separately configured sensors over the network.
 - Capturing CSI directly from the Linux host's WiFi adapter is unavailable. Use networked ESP32 sensors or explicitly select the synthetic demonstration.
 - Synthetic data does not establish sensing accuracy. Real sensing depends on the sensors, firmware, environment, and upstream model support.
-- The server's CLI and web dashboard are included. Desktop applications, mobile applications, firmware flashing, and contributor harnesses are not bundled.
+- Desktop and mobile applications are not bundled. Full model training and proof replay require the upstream source workspace and their development dependencies.
+- The CLI's MAT disaster assessment feature is not included. Use `ruview.cli train-room` for room training.
 - The browser needs internet access for upstream CDN assets. Optional browser WASM acceleration uses the upstream JavaScript fallback.
 
 ## Build
@@ -94,7 +120,7 @@ sudo snap install snapcraft --classic
 snapcraft pack
 ```
 
-Versions follow upstream's numeric sensing snapshots (`v3422`, etc.), independently of its AI harness releases.
+Versions follow upstream's numeric snapshots (`v3422`, etc.); the bundled toolkit has its own version.
 
 ## Support
 

@@ -3,11 +3,12 @@ base: core26
 version: '3446'
 title: RuView
 icon: snap/gui/ruview.png
-summary: Wi-Fi sensing server and browser dashboard for ESP32 sensors
+summary: Wi-Fi sensing server, dashboard and sensor toolkit
 description: |
   RuView receives Wi-Fi channel state information from compatible ESP32
   sensors and provides a browser dashboard, recordings and optional MQTT
-  integration. Real sensing requires separately provisioned sensor hardware.
+  integration. The operator toolkit, calibration CLI and ESP32 provisioning
+  tools are included. Real sensing requires compatible sensor hardware.
 
   Open http://localhost:8080/ui/index.html after installation. The service
   initially listens on loopback only and waits for sensor data. To explore
@@ -15,10 +16,11 @@ description: |
 
      sudo snap set ruview source=simulated
 
-  Server data is stored in /var/snap/ruview/common/data. This package builds
-  the sensing server from upstream snapshots, not the separate AI
-  harness or desktop application. Sensing output is experimental and is
-  not suitable for medical or safety-critical decisions.
+  Use ruview.toolkit for diagnostics, firmware flashing and MCP,
+  ruview.cli for calibration, and ruview.provision to configure sensor WiFi.
+
+  Server data is stored in /var/snap/ruview/common/data. Sensing output is
+  experimental and is not suitable for medical or safety-critical decisions.
 license: MIT
 grade: stable
 confinement: strict
@@ -34,6 +36,13 @@ contact: https://github.com/sidalit/ruview-snap/issues
 platforms:
   amd64:
   arm64:
+
+layout:
+  /usr/share/nodejs:
+    bind: $SNAP/usr/share/nodejs
+
+environment:
+  PATH: $SNAP/bin:$SNAP/usr/bin:$PATH
 
 apps:
   ruview:
@@ -51,17 +60,48 @@ apps:
     plugs:
       - network
       - network-bind
+  toolkit:
+    command: bin/ruview-toolkit
+    plugs:
+      - network
+      - network-bind
+      - home
+      - removable-media
+      - raw-usb
+      - serial-port
+      - ssh-keys
+  cli:
+    command: bin/wifi-densepose
+    plugs:
+      - network
+      - network-bind
+      - home
+      - removable-media
+      - desktop
+  provision:
+    command: bin/python3 $SNAP/share/ruview/provision.py
+    plugs:
+      - home
+      - removable-media
+      - raw-usb
+      - serial-port
 
 parts:
-  ruview:
-    plugin: rust
+  upstream:
+    plugin: nil
     source: https://github.com/ruvnet/RuView.git
     source-tag: v$SNAPCRAFT_PROJECT_VERSION
-    source-subdir: v2
     source-submodules:
       - v2/crates/ruview-swarm
       - v2/crates/worldgraph
       - vendor/rufield
+
+  ruview:
+    after: [upstream]
+    plugin: rust
+    source: $CRAFT_STAGE/../parts/upstream/src
+    source-type: local
+    source-subdir: v2
     rust-channel: '1.89'
     rust-path: [crates/wifi-densepose-sensing-server]
     rust-features: [mqtt]
@@ -79,6 +119,84 @@ parts:
       rm -rf "$CRAFT_PART_INSTALL/share/ruview/ui/mobile" \
         "$CRAFT_PART_INSTALL/share/ruview/ui/pose-fusion/pkg"
       install -Dm644 "$CRAFT_PART_SRC/LICENSE" "$CRAFT_PART_INSTALL/share/doc/ruview/LICENSE"
+
+  wifi-densepose:
+    after: [upstream]
+    plugin: rust
+    source: $CRAFT_STAGE/../parts/upstream/src
+    source-type: local
+    source-subdir: v2
+    rust-channel: '1.89'
+    rust-path: [crates/wifi-densepose-cli]
+    rust-no-default-features: true
+    rust-cargo-parameters: [--bin, wifi-densepose]
+    build-environment:
+      - CARGO_BUILD_JOBS: $CRAFT_PARALLEL_BUILD_COUNT
+    build-packages:
+      - build-essential
+      - pkg-config
+      - libssl-dev
+      - patch
+    stage-packages:
+      - xdg-utils
+    override-build: |
+      patch -d v2 -p1 < "$CRAFT_PROJECT_DIR/snap/patches/baseline-alias.patch"
+      craftctl default
+
+  toolkit:
+    after: [upstream]
+    plugin: nil
+    source: $CRAFT_STAGE/../parts/upstream/src/harness/ruview
+    source-type: local
+    build-packages:
+      - npm
+    stage-packages:
+      - nodejs
+      - openssh-client
+    override-build: |
+      npm ci --ignore-scripts
+      npm pack
+      mkdir -p "$CRAFT_PART_INSTALL/share/ruview/toolkit"
+      tar -xf ruvnet-ruview-*.tgz --strip-components=1 -C "$CRAFT_PART_INSTALL/share/ruview/toolkit"
+
+  firmware-tools:
+    after: [upstream]
+    plugin: nil
+    source: $CRAFT_STAGE/../parts/upstream/src/firmware/esp32-csi-node
+    source-type: local
+    build-packages:
+      - python3-venv
+    stage-packages:
+      - python3
+    override-build: |
+      /usr/bin/python3 -m venv "$CRAFT_PART_BUILD/venv"
+      "$CRAFT_PART_BUILD/venv/bin/pip" install --no-cache-dir --no-compile \
+        --target "$CRAFT_PART_INSTALL/share/ruview/python" \
+        'esptool==5.6.0' 'esp-idf-nvs-partition-gen==0.3.0' 'pyserial==3.5'
+      install -Dm644 provision.py "$CRAFT_PART_INSTALL/share/ruview/provision.py"
+
+  sensing-kernel:
+    after: [upstream]
+    plugin: nil
+    source: $CRAFT_STAGE/../parts/upstream/src
+    source-type: local
+    build-snaps:
+      - rustup
+    build-packages:
+      - build-essential
+      - npm
+    build-environment:
+      - RUSTUP_TOOLCHAIN: '1.89'
+      - CARGO_BUILD_JOBS: $CRAFT_PARALLEL_BUILD_COUNT
+    override-build: |
+      rustup toolchain install 1.89 --profile minimal --target wasm32-unknown-unknown
+      unset CARGO_TARGET_DIR
+      cd harness/ruview-kernel
+      node scripts/build.mjs --wasm
+      npm pack
+      target="$CRAFT_PART_INSTALL/share/ruview/toolkit/node_modules/@ruvnet/ruview-kernel"
+      mkdir -p "$target"
+      tar -xf ruvnet-ruview-kernel-*.tgz --strip-components=1 -C "$target"
 
   scripts:
     plugin: dump

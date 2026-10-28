@@ -1,0 +1,10 @@
+--- a/crates/wifi-densepose-cli/src/lib.rs
++++ b/crates/wifi-densepose-cli/src/lib.rs
+@@ -67,6 +67,7 @@
+     /// Empty-room baseline calibration (ADR-135).
+     /// Captures CSI frames via UDP and saves a per-subcarrier statistical
+     /// baseline used for real-time motion z-scoring and CIR reference.
++    #[command(alias = "baseline")]
+     Calibrate(calibrate::CalibrateArgs),
+ 
+     /// Run the calibration HTTP API (ADR-135/151) for a UI to drive.

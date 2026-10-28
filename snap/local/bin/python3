@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+# The toolkit removes SNAP and Python variables from its subprocess environment.
+snap_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+export PYTHONHOME="$snap_dir/usr"
+export PYTHONPATH="$snap_dir/share/ruview/python"
+exec "$snap_dir/usr/bin/python3" "$@"

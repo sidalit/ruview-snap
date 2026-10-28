@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+
+exec "$SNAP/usr/bin/node" "$SNAP/share/ruview/toolkit/bin/cli.js" "$@"
