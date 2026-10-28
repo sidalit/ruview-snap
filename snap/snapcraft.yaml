@@ -1,0 +1,85 @@
+name: ruview
+base: core26
+version: '3422'
+title: RuView
+icon: snap/gui/ruview.png
+summary: Wi-Fi sensing server and browser dashboard for ESP32 sensors
+description: |
+  RuView receives Wi-Fi channel state information from compatible ESP32
+  sensors and provides a browser dashboard, recordings and optional MQTT
+  integration. Real sensing requires separately provisioned sensor hardware.
+
+  Open http://localhost:8080/ui/index.html after installation. The service
+  initially listens on loopback only and waits for sensor data. To explore
+  synthetic data without hardware:
+
+     sudo snap set ruview source=simulated
+
+  Server data is stored in /var/snap/ruview/common/data. This package builds
+  the sensing server from upstream snapshots, not the separate AI
+  harness or desktop application. Sensing output is experimental and is
+  not suitable for medical or safety-critical decisions.
+license: MIT
+grade: stable
+confinement: strict
+website: https://cognitum.one/ruview
+source-code:
+  - https://github.com/ruvnet/RuView
+  - https://github.com/sidalit/ruview-snap
+issues:
+  - https://github.com/ruvnet/RuView/issues
+  - https://github.com/sidalit/ruview-snap/issues
+contact: https://github.com/sidalit/ruview-snap/issues
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  ruview:
+    command: bin/ruview-launch
+    plugs:
+      - network
+      - network-bind
+      - home
+      - removable-media
+  daemon:
+    command: bin/ruview-daemon
+    daemon: simple
+    restart-condition: on-failure
+    stop-mode: sigint
+    plugs:
+      - network
+      - network-bind
+
+parts:
+  ruview:
+    plugin: rust
+    source: https://github.com/ruvnet/RuView.git
+    source-tag: v$SNAPCRAFT_PROJECT_VERSION
+    source-subdir: v2
+    source-submodules:
+      - v2/crates/ruview-swarm
+      - v2/crates/worldgraph
+      - vendor/rufield
+    rust-channel: '1.89'
+    rust-path: [crates/wifi-densepose-sensing-server]
+    rust-features: [mqtt]
+    rust-cargo-parameters: [--bin, sensing-server]
+    build-environment:
+      - CARGO_BUILD_JOBS: $CRAFT_PARALLEL_BUILD_COUNT
+    build-packages:
+      - build-essential
+      - pkg-config
+      - libssl-dev
+    override-build: |
+      craftctl default
+      mkdir -p "$CRAFT_PART_INSTALL/share/ruview"
+      cp -a "$CRAFT_PART_SRC/ui" "$CRAFT_PART_INSTALL/share/ruview/"
+      rm -rf "$CRAFT_PART_INSTALL/share/ruview/ui/mobile" \
+        "$CRAFT_PART_INSTALL/share/ruview/ui/pose-fusion/pkg"
+      install -Dm644 "$CRAFT_PART_SRC/LICENSE" "$CRAFT_PART_INSTALL/share/doc/ruview/LICENSE"
+
+  scripts:
+    plugin: dump
+    source: snap/local

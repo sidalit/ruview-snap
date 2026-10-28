@@ -1,0 +1,65 @@
+#!/bin/sh
+set -eu
+umask 077
+
+[ -n "$(snapctl get source)" ] || snapctl set source=esp32
+[ -n "$(snapctl get address)" ] || snapctl set address=127.0.0.1
+[ -n "$(snapctl get udp-address)" ] || snapctl set udp-address=127.0.0.1
+
+source="$(snapctl get source)"
+address="$(snapctl get address)"
+allowed_hosts="$(snapctl get allowed-hosts)"
+api_token="$(snapctl get api-token)"
+udp_address="$(snapctl get udp-address)"
+udp_allow="$(snapctl get udp-allow)"
+
+fail() { echo "$1" >&2; exit 1; }
+valid_ipv4() {
+  case "$1" in '' | *[!0-9.]*) return 1 ;; esac
+  printf '%s\n' "$1" | awk -F. '
+    NF != 4 { exit 1 }
+    { for (i = 1; i <= 4; i++)
+        if ($i !~ /^[0-9]+$/ || length($i) > 3 || $i > 255 || $i ~ /^0[0-9]/)
+          exit 1
+    }'
+}
+
+case "$source" in
+  esp32 | simulated) ;;
+  *) fail 'source must be esp32 or simulated' ;;
+esac
+valid_ipv4 "$address" || fail 'address must be an IPv4 address without a port'
+valid_ipv4 "$udp_address" || fail 'udp-address must be an IPv4 address without a port'
+case "$allowed_hosts" in
+  *[![:print:]]*) fail 'allowed-hosts must not contain control characters' ;;
+esac
+case "$api_token" in
+  *[![:graph:]]*) fail 'api-token must not contain whitespace or control characters' ;;
+esac
+case "$udp_allow" in
+  *[!0-9.,/]* | ,* | *, | *,,*) fail 'udp-allow must be comma-separated IPv4 addresses or CIDRs' ;;
+esac
+for network in $(printf '%s' "$udp_allow" | tr ',' ' '); do
+  valid_ipv4 "${network%%/*}" || fail 'udp-allow contains an invalid IPv4 address'
+  case "$network" in
+    */*)
+      prefix="${network#*/}"
+      case "$prefix" in
+        '' | *[!0-9]* | ???*) fail 'udp-allow contains an invalid CIDR prefix' ;;
+      esac
+      [ "$prefix" -le 32 ] || fail 'udp-allow CIDR prefixes must be between 0 and 32'
+      ;;
+  esac
+done
+case "$address" in
+  127.*) ;;
+  *) [ -n "$api_token" ] || fail 'A non-loopback address requires api-token' ;;
+esac
+case "$udp_address" in
+  127.*) ;;
+  *) [ -n "$udp_allow" ] || fail 'A non-loopback udp-address requires udp-allow' ;;
+esac
+
+if snapctl services "$SNAP_INSTANCE_NAME.daemon" | awk 'NR > 1 {print $3}' | grep -qx active; then
+  snapctl restart "$SNAP_INSTANCE_NAME.daemon"
+fi

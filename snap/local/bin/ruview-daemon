@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+umask 077
+
+source="$(snapctl get source)"
+source="${source:-esp32}"
+SENSING_BIND_ADDR="$(snapctl get address)"
+SENSING_BIND_ADDR="${SENSING_BIND_ADDR:-127.0.0.1}"
+SENSING_ALLOWED_HOSTS="$(snapctl get allowed-hosts)"
+RUVIEW_UDP_BIND="$(snapctl get udp-address)"
+RUVIEW_UDP_BIND="${RUVIEW_UDP_BIND:-127.0.0.1}"
+RUVIEW_UDP_ALLOW="$(snapctl get udp-allow)"
+RUVIEW_DATA_DIR="$SNAP_COMMON/data"
+export SENSING_BIND_ADDR SENSING_ALLOWED_HOSTS RUVIEW_UDP_BIND RUVIEW_UDP_ALLOW RUVIEW_DATA_DIR
+
+api_token="$(snapctl get api-token)"
+if [ -n "$api_token" ]; then
+  RUVIEW_API_TOKEN="$api_token"
+  export RUVIEW_API_TOKEN
+else
+  unset RUVIEW_API_TOKEN
+fi
+
+mkdir -p "$RUVIEW_DATA_DIR"
+cd "$SNAP_COMMON"
+exec "$SNAP/bin/sensing-server" --source "$source" --ui-path "$SNAP/share/ruview/ui"

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "assignees": ["sidalit"],
+  "extends": ["github>sidalit/snap-automation#v1.1.0"],
+  "packageRules": [
+    {
+      "matchDepNames": ["upstream"],
+      "overridePackageName": "ruvnet/RuView",
+      "versioning": "semver-coerced",
+      "extractVersion": "^v(?<version>\\d+)$"
+    }
+  ]
+}
