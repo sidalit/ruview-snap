@@ -1,6 +1,6 @@
 name: ruview
 base: core26
-version: '3422'
+version: '3446'
 title: RuView
 icon: snap/gui/ruview.png
 summary: Wi-Fi sensing server and browser dashboard for ESP32 sensors
