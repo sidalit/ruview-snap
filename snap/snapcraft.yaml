@@ -1,6 +1,6 @@
 name: ruview
 base: core26
-version: '3446'
+version: '3548'
 title: RuView
 icon: snap/gui/ruview.png
 summary: Wi-Fi sensing server, dashboard and sensor toolkit
