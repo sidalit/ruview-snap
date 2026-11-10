@@ -139,9 +139,9 @@ parts:
       - patch
     stage-packages:
       - xdg-utils
-    override-build: |
-      patch -d v2 -p1 < "$CRAFT_PROJECT_DIR/snap/patches/baseline-alias.patch"
+    override-pull: |
       craftctl default
+      patch -d v2 -p1 < "$CRAFT_PROJECT_DIR/snap/patches/baseline-alias.patch"
 
   toolkit:
     after: [upstream]
