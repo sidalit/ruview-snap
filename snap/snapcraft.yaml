@@ -43,6 +43,7 @@ layout:
 
 environment:
   PATH: $SNAP/bin:$SNAP/usr/bin:$PATH
+  XDG_CONFIG_HOME: $SNAP_USER_DATA/.config
 
 apps:
   ruview:
