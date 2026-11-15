@@ -103,7 +103,7 @@ parts:
     source: $CRAFT_STAGE/../parts/upstream/src
     source-type: local
     source-subdir: v2
-    rust-channel: '1.89'
+    rust-channel: stable
     rust-path: [crates/wifi-densepose-sensing-server]
     rust-features: [mqtt]
     rust-cargo-parameters: [--bin, sensing-server]
@@ -127,7 +127,7 @@ parts:
     source: $CRAFT_STAGE/../parts/upstream/src
     source-type: local
     source-subdir: v2
-    rust-channel: '1.89'
+    rust-channel: stable
     rust-path: [crates/wifi-densepose-cli]
     rust-no-default-features: true
     rust-cargo-parameters: [--bin, wifi-densepose]
